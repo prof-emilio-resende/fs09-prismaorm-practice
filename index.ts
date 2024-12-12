@@ -1,4 +1,4 @@
-import { PrismaClient, User, Vehicle } from "@prisma/client";
+import { Prisma, PrismaClient, User, Vehicle } from "@prisma/client";
 
 const prisma = new PrismaClient({
     log: ["query", "info", "warn", "error"]
@@ -37,6 +37,35 @@ async function getUsersWithVehicles() {
     })
 }
 
+async function getOnlyUsersWithVehicles() {
+    return await prisma.user.findMany({
+        include: {
+            fleet: true
+        },
+        where: {
+            fleet: {
+                some: {
+                    NOT: {
+                        id: 0
+                    }
+                }
+            }
+        }
+    })
+}
+
+async function removeVehicles() {
+    const deleted = await prisma.vehicle.deleteMany({
+        where: {
+            id: {
+                gt: 0,
+            }
+        }
+    });
+    console.log('Veículos removidos...');
+    console.log(deleted);
+}
+
 async function removeUsers(users: Array<User>) {
     console.log("Removendo os usuários...");
     users.forEach(async (u) => {
@@ -49,8 +78,33 @@ async function removeUsers(users: Array<User>) {
     })
 }
 
+class UsersRepository {
+    public async findByFirstNameAndLastName(firstName: string, lastName: string) {
+        return await prisma.user.findMany({
+            where: {
+                firstName, 
+                lastName
+            }
+        })
+    }
+}
+
+async function queryNativaGenerica() {
+    console.log(`executando query nativa (generica)`);
+    const rawUsers = await prisma.$queryRaw(Prisma.sql`select * from user`);
+    console.log(rawUsers);
+}
+
+async function queryNativaComTipo() {
+    console.log(`executando query nativa (tipada)`);
+    const rawUsers = await prisma.$queryRaw<Array<User>>(Prisma.sql`select * from user`);
+    console.log(rawUsers);
+    rawUsers.forEach(u => console.log(u));
+}
+
 async function main () {
     const u = await createUser({firstName: "Emilio", lastName: "Resende"});
+    await createUser({firstName: "Joao", lastName: "Silva"});
     const users = await getUsers();
     console.log(users);
     console.log("criando veiculos");
@@ -60,8 +114,20 @@ async function main () {
     console.log(users2);
     const usersWithVehicles = await getUsersWithVehicles();
     console.log(usersWithVehicles);
+
+    const onlyUsersWithVehicles = await getOnlyUsersWithVehicles();
+    console.log(onlyUsersWithVehicles);
+
+    await queryNativaGenerica();
+    await queryNativaComTipo();
     
-    removeUsers(users);
+    const repo = new UsersRepository();
+    const u2 = await repo.findByFirstNameAndLastName("Joao", "Silva");
+    console.log('repositorios...');
+    console.log(u2);
+
+    await removeVehicles();
+    await removeUsers(users);
 }
 
 main()

@@ -22,5 +22,5 @@ model Vehicle {
   description String
   year Int
   userId Int
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
